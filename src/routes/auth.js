@@ -1,39 +1,72 @@
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+/**
+ * Rutas de Autenticación - Naxine API
+ * 
+ * Este archivo maneja todas las rutas relacionadas con la autenticación:
+ * - Registro de usuarios
+ * - Login/logout
+ * - Verificación de email
+ * - Recuperación de contraseña
+ * - Gestión de perfiles
+ * 
+ * @author Naxine Team
+ * @version 1.0.0
+ */
+
+const express = require('express');        // Framework web
+const bcrypt = require('bcryptjs');        // Para hashear contraseñas
+const jwt = require('jsonwebtoken');       // Para generar tokens JWT
+
+// Importar modelos de la base de datos
 const { Usuario, Profesional, Cliente } = require('../models');
+
+// Importar funciones de configuración OAuth
 const { 
-  passport, 
-  verificarJWT, 
-  verificarRol, 
-  generarJWT, 
-  generarTokenVerificacion,
-  enviarTokenVerificacion,
-  sincronizarConCognito,
-  TOKEN_CONFIRMATION_SECRET 
-} = require('../oauthConfig');
-const { 
-  createCognitoUser, 
-  getCognitoUser, 
-  updateUserAttributes,
-  listCognitoUsers 
-} = require('../awsConfig');
+  passport,                    // Configuración de Passport
+  verificarJWT,               // Middleware para verificar tokens JWT
+  verificarRol,               // Middleware para verificar roles
+  generarJWT,                 // Función para generar tokens JWT
+  generarTokenVerificacion,   // Función para generar tokens de verificación
+  enviarTokenVerificacion,    // Función para enviar emails de verificación
+  sincronizarConCognito,      // Función para sincronizar con Cognito (deprecated)
+  TOKEN_CONFIRMATION_SECRET   // Secreto para tokens de confirmación
+} = require('../config/oauthConfig');
 
 const router = express.Router();
 
-// Registro tradicional con email y contraseña
+// ============================================================================
+// RUTAS DE AUTENTICACIÓN
+// ============================================================================
+
+/**
+ * POST /auth/register - Registro de nuevo usuario
+ * 
+ * Permite a un usuario registrarse en el sistema con email y contraseña.
+ * Crea un nuevo usuario en la base de datos local.
+ * 
+ * Body requerido:
+ * - nombre: string (nombre completo del usuario)
+ * - email: string (email único)
+ * - password: string (contraseña)
+ * - rol: string (opcional, por defecto 'usuario')
+ * 
+ * Respuesta exitosa: 201 con datos del usuario creado
+ * Errores: 400 si faltan datos o email ya existe
+ */
+// POST /register - auth
 router.post('/register', async (req, res) => {
+    // Procesar petición y devolver respuesta
   try {
+    // Extraer datos del cuerpo de la petición
     const { nombre, email, password, rol = 'usuario' } = req.body;
 
-    // Validar datos requeridos
+    // Validar que se proporcionaron todos los datos requeridos
     if (!nombre || !email || !password) {
       return res.status(400).json({ 
         message: 'Nombre, email y contraseña son requeridos' 
       });
     }
 
-    // Verificar si el email ya existe
+    // Verificar si ya existe un usuario con ese email
     const usuarioExistente = await Usuario.findOne({ where: { email } });
     if (usuarioExistente) {
       return res.status(400).json({ 
@@ -41,7 +74,8 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Encriptar contraseña
+    // Encriptar la contraseña usando bcrypt
+    // Salt rounds: número de iteraciones para hacer el hash más seguro
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
@@ -94,7 +128,9 @@ router.post('/register', async (req, res) => {
 });
 
 // Login tradicional con email y contraseña
+// POST /login - auth
 router.post('/login', async (req, res) => {
+    // Procesar petición y devolver respuesta
   try {
     const { email, password } = req.body;
 
@@ -157,7 +193,9 @@ router.post('/login', async (req, res) => {
 });
 
 // Verificación de email
+// GET /verify-email/:token - auth
 router.get('/verify-email/:token', async (req, res) => {
+    // Procesar petición y devolver respuesta
   try {
     const { token } = req.params;
 
@@ -193,7 +231,9 @@ router.get('/verify-email/:token', async (req, res) => {
 });
 
 // Reenviar email de verificación
+// POST /resend-verification - auth
 router.post('/resend-verification', async (req, res) => {
+    // Procesar petición y devolver respuesta
   try {
     const { email } = req.body;
 
@@ -225,7 +265,9 @@ router.post('/resend-verification', async (req, res) => {
 });
 
 // Obtener perfil del usuario autenticado
+// GET /profile - auth
 router.get('/profile', verificarJWT, async (req, res) => {
+    // Procesar petición y devolver respuesta
   try {
     const usuario = await Usuario.findByPk(req.user.id_usuario, {
       attributes: { exclude: ['password', 'token_verificacion'] }
@@ -243,7 +285,9 @@ router.get('/profile', verificarJWT, async (req, res) => {
 });
 
 // Actualizar perfil del usuario
+// PUT /profile - auth
 router.put('/profile', verificarJWT, async (req, res) => {
+    // Procesar petición y devolver respuesta
   try {
     const { nombre, telefono } = req.body;
     const usuario = await Usuario.findByPk(req.user.id_usuario);
@@ -282,7 +326,9 @@ router.put('/profile', verificarJWT, async (req, res) => {
 });
 
 // Cambiar contraseña
+// PUT /change-password - auth
 router.put('/change-password', verificarJWT, async (req, res) => {
+    // Procesar petición y devolver respuesta
   try {
     const { currentPassword, newPassword } = req.body;
 
@@ -326,7 +372,9 @@ router.put('/change-password', verificarJWT, async (req, res) => {
 });
 
 // Rutas para administradores
+// GET /users - auth
 router.get('/users', verificarJWT, verificarRol(['administrador']), async (req, res) => {
+    // Procesar petición y devolver respuesta
   try {
     const usuarios = await Usuario.findAll({
       attributes: { exclude: ['password', 'token_verificacion'] },
@@ -341,7 +389,9 @@ router.get('/users', verificarJWT, verificarRol(['administrador']), async (req, 
 });
 
 // Actualizar rol de usuario (solo administradores)
+// PUT /users/:id/role - auth específico por ID
 router.put('/users/:id/role', verificarJWT, verificarRol(['administrador']), async (req, res) => {
+    // Procesar petición y devolver respuesta
   try {
     const { id } = req.params;
     const { rol } = req.body;
@@ -382,7 +432,9 @@ router.put('/users/:id/role', verificarJWT, verificarRol(['administrador']), asy
 });
 
 // Activar/desactivar usuario (solo administradores)
+// PUT /users/:id/status - auth específico por ID
 router.put('/users/:id/status', verificarJWT, verificarRol(['administrador']), async (req, res) => {
+    // Procesar petición y devolver respuesta
   try {
     const { id } = req.params;
     const { activo } = req.body;
@@ -410,7 +462,9 @@ router.put('/users/:id/status', verificarJWT, verificarRol(['administrador']), a
 });
 
 // Sincronizar usuarios con Cognito (solo administradores)
+// POST /sync-cognito - auth
 router.post('/sync-cognito', verificarJWT, verificarRol(['administrador']), async (req, res) => {
+    // Procesar petición y devolver respuesta
   try {
     const usuarios = await Usuario.findAll();
     let sincronizados = 0;

@@ -1,10 +1,34 @@
+/**
+ * Modelos de Base de Datos - Naxine API
+ * 
+ * Este archivo define todos los modelos de la base de datos usando Sequelize ORM.
+ * Incluye las relaciones entre las entidades del sistema.
+ * 
+ * Entidades principales:
+ * - Usuario: Usuarios del sistema (usuarios, profesionales, administradores)
+ * - Cliente: Pacientes/clientes del sistema
+ * - Profesional: Profesionales de la salud
+ * - Sesion: Citas y sesiones médicas
+ * - Valoracion: Calificaciones y comentarios
+ * - Pago: Transacciones de pago
+ * - Precio: Tarifas por especialidad
+ * 
+ * @author Naxine Team
+ * @version 1.0.0
+ */
+
 const { Sequelize, DataTypes } = require('sequelize');
 
-// Configuración de la base de datos
+// ============================================================================
+// CONFIGURACIÓN DE LA BASE DE DATOS
+// ============================================================================
+
+// Configuración de Sequelize para SQLite
+// En producción se puede cambiar a MySQL/PostgreSQL
 const sequelize = new Sequelize({
-  dialect: 'sqlite',
-  storage: './database.sqlite',
-  logging: false
+  dialect: 'sqlite',           // Tipo de base de datos
+  storage: './database.sqlite', // Archivo de la base de datos SQLite
+  logging: false               // Desactivar logs de SQL en producción
 });
 
 // Modelo de Usuario con 3 niveles

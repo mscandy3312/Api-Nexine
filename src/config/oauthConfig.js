@@ -1,47 +1,60 @@
-const passport = require('passport');
-const JwtStrategy = require('passport-jwt').Strategy;
-const ExtractJwt = require('passport-jwt').ExtractJwt;
-const { Usuario } = require('./models');
-const { 
-  verifyCognitoJWT, 
-  verifyRole,
-  createCognitoUser,
-  getCognitoUser,
-  updateUserAttributes,
-  COGNITO_CONFIG
-} = require('./awsConfig');
-const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
+/**
+ * Configuración OAuth - Naxine API
+ * 
+ * Este archivo maneja toda la configuración de autenticación OAuth:
+ * - Configuración de Passport JWT
+ * - Generación y verificación de tokens
+ * - Envío de emails de verificación
+ * - Middleware de autenticación y autorización
+ * 
+ * @author Naxine Team
+ * @version 1.0.0
+ */
 
-// Cargar configuración desde config.js
-const config = require('./config');
+const passport = require('passport');                    // Framework de autenticación
+const JwtStrategy = require('passport-jwt').Strategy;    // Estrategia JWT para Passport
+const ExtractJwt = require('passport-jwt').ExtractJwt;   // Para extraer JWT de headers
+const { Usuario } = require('../models');                // Modelo de Usuario
+const jwt = require('jsonwebtoken');                     // Para generar/verificar tokens JWT
+const nodemailer = require('nodemailer');                // Para envío de emails
 
-const SECRET_KEY = config.JWT_SECRET;
-const TOKEN_CONFIRMATION_SECRET = config.TOKEN_CONFIRMATION_SECRET;
+// ============================================================================
+// CONFIGURACIÓN
+// ============================================================================
 
-// Configuración de Nodemailer
+// Cargar configuración desde el archivo de configuración
+const config = require('./index');
+
+// Claves secretas para firmar tokens
+const SECRET_KEY = config.JWT_SECRET;                    // Para tokens de autenticación
+const TOKEN_CONFIRMATION_SECRET = config.TOKEN_CONFIRMATION_SECRET; // Para tokens de verificación
+
+// ============================================================================
+// CONFIGURACIÓN DE EMAIL
+// ============================================================================
+
+// Configuración de Nodemailer para envío de emails
+// Usa Gmail como servicio de email
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  service: 'gmail',                    // Servicio de email (Gmail)
   auth: {
-    user: config.EMAIL_USER,
-    pass: config.EMAIL_PASS
+    user: config.EMAIL_USER,           // Email del remitente
+    pass: config.EMAIL_PASS            // Contraseña de aplicación de Gmail
   }
 });
 
-// Configuración de Passport JWT para Cognito
+// Configuración de Passport JWT
 const jwtOptions = {
   jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-  secretOrKey: COGNITO_CONFIG.JWKS_URI,
-  issuer: `https://cognito-idp.${COGNITO_CONFIG.Region}.amazonaws.com/${COGNITO_CONFIG.UserPoolId}`,
-  audience: COGNITO_CONFIG.ClientId,
-  algorithms: ['RS256']
+  secretOrKey: SECRET_KEY,
+  algorithms: ['HS256']
 };
 
-// Estrategia JWT para Cognito
+// Estrategia JWT
 passport.use(new JwtStrategy(jwtOptions, async (payload, done) => {
   try {
     // Buscar usuario en la base de datos local
-    let usuario = await Usuario.findOne({ 
+    const usuario = await Usuario.findOne({ 
       where: { email: payload.email } 
     });
 
@@ -51,22 +64,7 @@ passport.use(new JwtStrategy(jwtOptions, async (payload, done) => {
       return done(null, usuario);
     }
 
-    // Si no existe en la BD local, crearlo
-    const nuevoUsuario = await Usuario.create({
-      email: payload.email,
-      nombre: payload.name || payload.email,
-      google_id: payload.sub, // Usar sub como identificador único
-      email_verificado: payload.email_verified === 'true',
-      rol: payload['custom:role'] || 'usuario',
-      activo: true,
-      fecha_creacion: new Date(),
-      ultimo_acceso: new Date()
-    });
-
-    // Enviar email de bienvenida
-    await enviarEmailBienvenida(nuevoUsuario.email, nuevoUsuario.nombre);
-
-    return done(null, nuevoUsuario);
+    return done(null, false);
   } catch (error) {
     console.error('Error en estrategia JWT:', error);
     return done(error, null);
@@ -144,7 +142,7 @@ const enviarTokenVerificacion = async (email, nombre, token) => {
   }
 };
 
-// Función para generar JWT token (para uso interno)
+// Función para generar JWT token
 const generarJWT = (usuario) => {
   return jwt.sign(
     { 
@@ -163,35 +161,36 @@ const generarTokenVerificacion = (email) => {
   return jwt.sign({ email }, TOKEN_CONFIRMATION_SECRET, { expiresIn: '24h' });
 };
 
-// Middleware para verificar JWT (usar el de AWS Cognito)
-const verificarJWT = verifyCognitoJWT;
-
-// Middleware para verificar roles (usar el de AWS Cognito)
-const verificarRol = verifyRole;
-
-// Función para sincronizar usuario con Cognito
-const sincronizarConCognito = async (usuario, password = null) => {
-  try {
-    // Verificar si el usuario existe en Cognito
-    const cognitoUser = await getCognitoUser(usuario.email);
-    
-    if (!cognitoUser) {
-      // Crear usuario en Cognito
-      await createCognitoUser(usuario.email, password || 'TempPassword123!', {
-        'custom:role': usuario.rol,
-        'name': usuario.nombre
-      });
-    } else {
-      // Actualizar atributos en Cognito
-      await updateUserAttributes(usuario.email, {
-        'custom:role': usuario.rol,
-        'name': usuario.nombre
-      });
-    }
-  } catch (error) {
-    console.error('Error sincronizando con Cognito:', error);
-    throw error;
+// Middleware para verificar JWT
+const verificarJWT = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({ message: 'Token no proporcionado' });
   }
+
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ message: 'Token inválido' });
+  }
+};
+
+// Middleware para verificar roles
+const verificarRol = (roles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Usuario no autenticado' });
+    }
+
+    if (!roles.includes(req.user.rol)) {
+      return res.status(403).json({ message: 'Acceso denegado' });
+    }
+
+    next();
+  };
 };
 
 module.exports = {
@@ -203,7 +202,6 @@ module.exports = {
   generarTokenVerificacion,
   verificarJWT,
   verificarRol,
-  sincronizarConCognito,
   SECRET_KEY,
   TOKEN_CONFIRMATION_SECRET
 };

@@ -1,10 +1,25 @@
+/**
+ * Rutas de Usuarios - Naxine API
+ * 
+ * Este archivo maneja todas las rutas relacionadas con usuarios:
+ * - CRUD básico (Create, Read, Update, Delete)
+ * - Búsquedas y filtros
+ * - Estadísticas y reportes
+ * - Validaciones de permisos por rol
+ * 
+ * @author Naxine Team
+ * @version 1.0.0
+ */
+
 const express = require('express');
 const router = express.Router();
 const { Usuario, Profesional, Cliente } = require('../models');
-const { verificarJWT, verificarRol } = require('../oauthConfig');
+const { verificarJWT, verificarRol } = require('../config/oauthConfig');
 
 // Obtener todos los usuarios (solo administradores)
+// GET / - Listar todos los usuarios
 router.get('/', verificarJWT, verificarRol(['administrador']), async (req, res) => {
+    // Procesar petición y devolver respuesta
     try {
         const usuarios = await Usuario.findAll({
             attributes: { exclude: ['password', 'token_verificacion'] },
@@ -27,7 +42,9 @@ router.get('/', verificarJWT, verificarRol(['administrador']), async (req, res) 
 });
 
 // Obtener usuario por id (solo administradores)
+// GET /:id - Obtener usuarios por ID
 router.get('/:id', verificarJWT, verificarRol(['administrador']), async (req, res) => {
+    // Procesar petición y devolver respuesta
     try {
         const usuario = await Usuario.findByPk(req.params.id, {
             attributes: { exclude: ['password', 'token_verificacion'] },
@@ -54,7 +71,9 @@ router.get('/:id', verificarJWT, verificarRol(['administrador']), async (req, re
 });
 
 // Actualizar usuario (solo administradores)
+// PUT /:id - Obtener usuarios por ID
 router.put('/:id', verificarJWT, verificarRol(['administrador']), async (req, res) => {
+    // Procesar petición y devolver respuesta
     try {
         const usuario = await Usuario.findByPk(req.params.id);
         if (!usuario) {
@@ -82,7 +101,9 @@ router.put('/:id', verificarJWT, verificarRol(['administrador']), async (req, re
 });
 
 // Eliminar usuario (solo administradores)
+// DELETE /:id - Obtener usuarios por ID
 router.delete('/:id', verificarJWT, verificarRol(['administrador']), async (req, res) => {
+    // Procesar petición y devolver respuesta
     try {
         const usuario = await Usuario.findByPk(req.params.id);
         if (!usuario) {
@@ -107,7 +128,9 @@ router.delete('/:id', verificarJWT, verificarRol(['administrador']), async (req,
 });
 
 // Obtener estadísticas de usuarios (solo administradores)
+// GET /stats/overview - Estadísticas de usuarios (solo administradores)
 router.get('/stats/overview', verificarJWT, verificarRol(['administrador']), async (req, res) => {
+    // Procesar petición y devolver respuesta
     try {
         const totalUsuarios = await Usuario.count();
         const usuariosActivos = await Usuario.count({ where: { activo: true } });
@@ -140,7 +163,9 @@ router.get('/stats/overview', verificarJWT, verificarRol(['administrador']), asy
 });
 
 // Buscar usuarios (solo administradores)
+// GET /search/:query - Buscar usuarios
 router.get('/search/:query', verificarJWT, verificarRol(['administrador']), async (req, res) => {
+    // Procesar petición y devolver respuesta
     try {
         const { query } = req.params;
         
@@ -162,3 +187,4 @@ router.get('/search/:query', verificarJWT, verificarRol(['administrador']), asyn
 });
 
 module.exports = router;
+
