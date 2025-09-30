@@ -1,0 +1,96 @@
+# ============================================================================
+# DOCKER COMPOSE PARA API NAXINE - PRODUCCIÓN
+# ============================================================================
+version: '3.8'
+
+services:
+  # Servicio principal de la API
+  naxine-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: naxine-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      # Configuración de base de datos
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=naxine_prod
+      - DB_USER=naxine_user
+      - DB_PASS=naxine_password
+      # Configuración JWT
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - TOKEN_CONFIRMATION_SECRET=your-token-confirmation-secret-change-this
+      # Configuración de email (opcional)
+      - EMAIL_USER=your-email@gmail.com
+      - EMAIL_PASS=your-app-password
+    volumes:
+      # Persistir la base de datos SQLite
+      - naxine_data:/usr/src/app/data
+      # Persistir logs
+      - naxine_logs:/usr/src/app/logs
+    depends_on:
+      - db
+    networks:
+      - naxine-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Base de datos PostgreSQL (opcional, para producción)
+  db:
+    image: postgres:15-alpine
+    container_name: naxine-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=naxine_prod
+      - POSTGRES_USER=naxine_user
+      - POSTGRES_PASSWORD=naxine_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - naxine-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U naxine_user -d naxine_prod"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx como proxy reverso (opcional, para producción)
+  nginx:
+    image: nginx:alpine
+    container_name: naxine-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - naxine-api
+    networks:
+      - naxine-network
+
+# Volúmenes para persistir datos
+volumes:
+  naxine_data:
+    driver: local
+  naxine_logs:
+    driver: local
+  postgres_data:
+    driver: local
+
+# Red para comunicación entre servicios
+networks:
+  naxine-network:
+    driver: bridge

@@ -1,0 +1,104 @@
+# ============================================================================
+# DOCKERIGNORE PARA API NAXINE
+# ============================================================================
+# Archivos y directorios que NO se incluirán en la imagen Docker
+
+# Dependencias de Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Archivos de entorno y configuración local
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Archivos de Git
+.git/
+.gitignore
+
+# Archivos de documentación
+README.md
+*.md
+docs/
+
+# Archivos de test y desarrollo
+test/
+tests/
+__tests__/
+*.test.js
+*.spec.js
+
+# Archivos de IDE y editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Archivos temporales
+tmp/
+temp/
+.tmp/
+
+# Archivos de backup
+*.bak
+*.backup
+
+# Archivos de Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Archivos de CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Archivos de configuración de desarrollo
+nodemon.json
+.eslintrc*
+.prettierrc*
+
+# Archivos de base de datos de desarrollo
+*.sqlite
+*.db
+database.sqlite
+
+# Archivos de configuración de AWS (ya no se usan)
+awsConfig.js
+cognito-setup.md
+setupCognitoGroups.js
+setupComplete.js
+listUserPools.js
+listAppClients.js
+testCognito.js
+testCredentials.js
+verifyPermissions.js
+
+# Archivos de test y verificación
+test*.js
+quickTest.js
+testApi.js
+testAuth.js
+testAllEndpoints.js
+API_ENDPOINTS_VERIFICATION.md
+
+# Archivos de configuración de ejemplo
+config.example.js
+env.example
+
+# Archivos de reemplazo y estado
+replacements.txt
+tatus
